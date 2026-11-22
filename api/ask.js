@@ -1,10 +1,10 @@
 export const config = { maxDuration: 60 };
 
-const MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+const MODELS = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
 
 async function callGemini(model, prompt, key) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
+  const timer = setTimeout(() => ctrl.abort(), 12000);
   try {
     const r = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',
@@ -13,7 +13,7 @@ async function callGemini(model, prompt, key) {
         headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 4000 }
+          generationConfig: { maxOutputTokens: 2000 }
         }),
         signal: ctrl.signal
       }
@@ -37,11 +37,14 @@ export default async function handler(req, res) {
   }
   const errs = [];
   for (const model of MODELS) {
+    const t0 = Date.now();
     try {
       const text = await callGemini(model, prompt, process.env.GEMINI_API_KEY);
-      return res.status(200).json({ text, model });
+      const sec = ((Date.now() - t0) / 1000).toFixed(1);
+      const note = errs.length ? '\n\n[' + model + ', ' + sec + 's; മുമ്പത്തേത്: ' + errs.join(' | ') + ']' : '\n\n[' + model + ', ' + sec + 's]';
+      return res.status(200).json({ text: text + note });
     } catch (e) {
-      const msg = e.name === 'AbortError' ? 'സമയം കഴിഞ്ഞു' : String(e.message).slice(0, 160);
+      const msg = e.name === 'AbortError' ? 'സമയം കഴിഞ്ഞു' : String(e.message).slice(0, 120);
       errs.push(model + ': ' + msg);
     }
   }
