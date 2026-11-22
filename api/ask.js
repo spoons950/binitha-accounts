@@ -1,6 +1,6 @@
 export const config = { maxDuration: 60 };
 
-const MODELS = ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-2.5-flash-lite'];
+const MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
 
 async function callGemini(model, prompt, key) {
   const ctrl = new AbortController();
@@ -35,14 +35,15 @@ export default async function handler(req, res) {
   if (!prompt || prompt.length > 3000) {
     return res.status(400).json({ error: 'ചോദ്യം ശരിയല്ല' });
   }
-  let lastErr = '';
+  const errs = [];
   for (const model of MODELS) {
     try {
       const text = await callGemini(model, prompt, process.env.GEMINI_API_KEY);
       return res.status(200).json({ text, model });
     } catch (e) {
-      lastErr = model + ': ' + (e.name === 'AbortError' ? 'സമയം കഴിഞ്ഞു' : e.message);
+      const msg = e.name === 'AbortError' ? 'സമയം കഴിഞ്ഞു' : String(e.message).slice(0, 160);
+      errs.push(model + ': ' + msg);
     }
   }
-  return res.status(500).json({ error: lastErr });
+  return res.status(500).json({ error: errs.join(' | ') });
 }
